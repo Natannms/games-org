@@ -59,6 +59,13 @@ const mockData: Member[] = [
   { id: "10", name: "Jack Black", email: "jack@example.com", role: "member", status: "active" },
 ];
 
+async function getMembers(): Promise<Member[]> {
+  // In a real application, you would fetch this from your database.
+  // For now, we're returning the mock data.
+  return Promise.resolve(mockData);
+}
+
+
 export const columns: ColumnDef<Member>[] = [
   {
     accessorKey: "name",
@@ -133,11 +140,15 @@ export const columns: ColumnDef<Member>[] = [
 ];
 
 export function MemberTableClient() {
-  const [data, setData] = React.useState(() => [...mockData]);
+  const [data, setData] = React.useState<Member[]>([]);
   const [isInviteOpen, setInviteOpen] = React.useState(false);
   const [sorting, setSorting] = React.useState<SortingState>([]);
   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([]);
   const [columnVisibility, setColumnVisibility] = React.useState<VisibilityState>({});
+
+  React.useEffect(() => {
+    getMembers().then(setData);
+  }, []);
 
 
   const table = useReactTable({
