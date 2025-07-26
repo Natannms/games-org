@@ -10,7 +10,8 @@ import {
   Users,
   Search,
   Building,
-  LayoutDashboard
+  LayoutDashboard,
+  RefreshCcw
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -43,7 +44,7 @@ import {
 } from "@/components/ui/sidebar";
 
 const navItems = [
-  { href: "/dashboard", icon: LayoutDashboard, label: "Dashboard" },
+  { href: "/dashboard", icon: RefreshCcw, label: "Dashboard" },
   { href: "/dashboard/games", icon: Swords, label: "Game List" },
   { href: "/dashboard/members", icon: Users, label: "Members" },
 ];
@@ -94,7 +95,10 @@ export default function DashboardLayout({
         {navItems.map((item) => (
             <SidebarMenuItem key={item.href}>
                 <Link href={item.href}>
-                    <SidebarMenuButton isActive={pathname.startsWith(item.href) && (item.href === "/dashboard" || pathname !== "/dashboard")} tooltip={item.label}>
+                    <SidebarMenuButton 
+                        isActive={pathname.startsWith(item.href) && (item.href === "/dashboard" ? pathname === item.href : true)} 
+                        tooltip={item.label}
+                    >
                         <item.icon />
                         <span>{item.label}</span>
                     </SidebarMenuButton>

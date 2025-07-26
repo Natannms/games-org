@@ -58,6 +58,8 @@ export type Game = {
   wasDrawn: boolean;
   suggestedBy: string;
   organizationId: string;
+  drawCount?: number;
+  lastDrawnAt?: Date;
 };
 
 const categoryIcons = {
@@ -122,6 +124,18 @@ export const columns: ColumnDef<Game>[] = [
         </div>
       );
     },
+  },
+   {
+    accessorKey: "drawCount",
+    header: () => <div className="text-center">Draw Count</div>,
+    cell: ({ row }) => {
+        const count = row.getValue("drawCount") as number | undefined;
+        return (
+          <div className="text-center font-medium">
+            {count || 0}
+          </div>
+        );
+      },
   },
   {
     accessorKey: "suggestedBy",
@@ -238,6 +252,7 @@ export function GameTableClient() {
             wasDrawn: false,
             suggestedBy: currentUser.displayName || currentUser.email,
             organizationId: organizationId,
+            drawCount: 0,
         };
         await addDoc(collection(db, 'games_list'), gameDoc);
         fetchGames(organizationId);
