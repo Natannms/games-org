@@ -42,15 +42,16 @@ import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Card, CardContent } from "./ui/card";
 import { Input } from "@/components/ui/input";
-import { db } from "@/lib/firebase";
-import { collection, getDocs, QueryDocumentSnapshot, DocumentData, doc, updateDoc } from "firebase/firestore";
+import { auth, db } from "@/lib/firebase";
+import { collection, getDocs, QueryDocumentSnapshot, DocumentData, doc, updateDoc, query, where } from "firebase/firestore";
 import { useToast } from "@/hooks/use-toast";
 
 
-export type MemberRole = "admin" | "member" | "viewer" | "moderator";
+export type MemberRole = "admin" | "member" | "viewer" | "moderator" | "owner";
 
 export type Member = {
   id: string;
+  uid: string;
   name: string;
   email: string;
   role: MemberRole;
@@ -66,6 +67,7 @@ async function getMembers(): Promise<Member[]> {
     const data = doc.data();
     return {
         id: doc.id,
+        uid: data.uid,
         name: data.name,
         email: data.email,
         role: data.role,
@@ -81,11 +83,29 @@ export function MemberTableClient() {
     const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([]);
     const [columnVisibility, setColumnVisibility] = React.useState<VisibilityState>({});
     const { toast } = useToast();
-  
+    const [currentUserRole, setCurrentUserRole] = React.useState<MemberRole | null>(null);
+
     const fetchMembers = React.useCallback(async () => {
       try {
+        const user = auth.currentUser;
+        if (!user) {
+            setData([]);
+            setCurrentUserRole(null);
+            return;
+        }
+
         const members = await getMembers();
         setData(members);
+
+        const q = query(collection(db, "games_members"), where("uid", "==", user.uid));
+        const querySnapshot = await getDocs(q);
+        if (!querySnapshot.empty) {
+          const memberData = querySnapshot.docs[0].data();
+          setCurrentUserRole(memberData.role as MemberRole);
+        } else {
+            setCurrentUserRole(null);
+        }
+
       } catch (error) {
         console.error("Failed to fetch members:", error);
         toast({
@@ -108,7 +128,6 @@ export function MemberTableClient() {
             title: "Success",
             description: "Member role updated successfully.",
           });
-          // Refresh the data to show the updated role
           fetchMembers();
         } catch (error) {
           console.error("Failed to update role:", error);
@@ -136,7 +155,7 @@ export function MemberTableClient() {
               },
             cell: ({ row }) => {
                 const name = row.getValue("name") as string;
-                const fallback = name.split(' ').map(n => n[0]).join('');
+                const fallback = name ? name.split(' ').map(n => n[0]).join('') : '';
               return (
                 <div className="flex items-center gap-2">
                   <Avatar>
@@ -170,11 +189,13 @@ export function MemberTableClient() {
             id: "actions",
             cell: ({ row }) => {
               const member = row.original;
+              const canManage = currentUserRole === 'admin' || currentUserRole === 'owner';
+
               return (
                 <div className="text-right">
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" className="h-8 w-8 p-0">
+                      <Button variant="ghost" className="h-8 w-8 p-0" disabled={!canManage}>
                         <span className="sr-only">Open menu</span>
                         <MoreHorizontal className="h-4 w-4" />
                       </Button>
@@ -182,7 +203,7 @@ export function MemberTableClient() {
                     <DropdownMenuContent align="end">
                       <DropdownMenuLabel>Actions</DropdownMenuLabel>
                       <DropdownMenuSub>
-                        <DropdownMenuSubTrigger>Change Role</DropdownMenuSubTrigger>
+                        <DropdownMenuSubTrigger disabled={!canManage || member.role === 'owner'}>Change Role</DropdownMenuSubTrigger>
                         <DropdownMenuSubContent>
                           <DropdownMenuRadioGroup 
                             value={member.role}
@@ -198,7 +219,7 @@ export function MemberTableClient() {
                       </DropdownMenuSub>
                       {member.status === 'invited' && <DropdownMenuItem>Resend Invite</DropdownMenuItem>}
                       <DropdownMenuSeparator />
-                      <DropdownMenuItem className="text-destructive">Remove Member</DropdownMenuItem>
+                      <DropdownMenuItem className="text-destructive" disabled={!canManage || member.role === 'owner'}>Remove Member</DropdownMenuItem>
                     </DropdownMenuContent>
                   </DropdownMenu>
                 </div>

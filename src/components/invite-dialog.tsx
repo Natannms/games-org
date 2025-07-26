@@ -17,6 +17,7 @@ import { Copy } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { auth, db } from "@/lib/firebase";
 import { collection, query, where, getDocs, updateDoc, doc } from "firebase/firestore";
+import type { MemberRole } from "./member-table-client";
 
 interface InviteDialogProps {
   isOpen: boolean;
@@ -26,6 +27,22 @@ interface InviteDialogProps {
 export function InviteDialog({ isOpen, setOpen }: InviteDialogProps) {
   const [inviteLink, setInviteLink] = React.useState("");
   const { toast } = useToast();
+  const [currentUserRole, setCurrentUserRole] = React.useState<MemberRole | null>(null);
+
+  React.useEffect(() => {
+      const fetchUserRole = async () => {
+          const user = auth.currentUser;
+          if (user) {
+              const membersQuery = query(collection(db, "games_members"), where("uid", "==", user.uid));
+              const querySnapshot = await getDocs(membersQuery);
+              if (!querySnapshot.empty) {
+                  const memberData = querySnapshot.docs[0].data();
+                  setCurrentUserRole(memberData.role as MemberRole);
+              }
+          }
+      };
+      fetchUserRole();
+  }, []);
 
   React.useEffect(() => {
     async function generateInviteLink() {
@@ -36,20 +53,32 @@ export function InviteDialog({ isOpen, setOpen }: InviteDialogProps) {
           return;
         }
 
+        if (currentUserRole !== 'admin' && currentUserRole !== 'owner') {
+            toast({ title: "Permission Denied", description: "You don't have permission to invite members.", variant: "destructive" });
+            return;
+        }
+        
         try {
-          const orgQuery = query(collection(db, "game_organization"), where("ownerId", "==", user.uid));
-          const orgSnapshot = await getDocs(orgQuery);
-
-          if (orgSnapshot.empty) {
-            toast({ title: "Error", description: "You don't own an organization to invite members to.", variant: "destructive" });
+          // An admin might not be the owner, so we need to find the organization via membership
+          const membersQuery = query(collection(db, "games_members"), where("uid", "==", user.uid));
+          const memberSnapshot = await getDocs(membersQuery);
+          if(memberSnapshot.empty) {
+            toast({ title: "Error", description: "You are not part of any organization.", variant: "destructive" });
+            return;
+          }
+          const organizationId = memberSnapshot.docs[0].data().organizationId;
+          const orgDocRef = doc(db, "game_organization", organizationId);
+          const orgDocSnap = await getDocs(query(collection(db, "game_organization"), where("__name__", "==", organizationId)));
+          
+          if (orgDocSnap.empty) {
+            toast({ title: "Error", description: "Organization not found.", variant: "destructive" });
             return;
           }
 
-          const orgDoc = orgSnapshot.docs[0];
+          const orgDoc = orgDocSnap.docs[0];
           let inviteCode = orgDoc.data().inviteCode;
 
           if (!inviteCode) {
-            // Generate a simple unique invite code. For production, a more robust solution is recommended.
             inviteCode = `org_${orgDoc.id.substring(0, 8)}`;
             await updateDoc(doc(db, "game_organization", orgDoc.id), { inviteCode });
           }
@@ -63,8 +92,10 @@ export function InviteDialog({ isOpen, setOpen }: InviteDialogProps) {
         }
       }
     }
-    generateInviteLink();
-  }, [isOpen, toast]);
+    if(currentUserRole) {
+        generateInviteLink();
+    }
+  }, [isOpen, toast, currentUserRole]);
 
   const copyToClipboard = () => {
     if(!inviteLink) {
