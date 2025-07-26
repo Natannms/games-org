@@ -178,13 +178,6 @@ export function MemberTableClient() {
           }
           className="max-w-sm"
         />
-        <div className="ml-auto">
-          <Button asChild>
-            <Link href="/dashboard/members/invite">
-              <PlusCircle className="mr-2 h-4 w-4" /> Invite Member
-            </Link>
-          </Button>
-        </div>
       </div>
       <Card>
         <CardContent className="p-0">
