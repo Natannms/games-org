@@ -1,3 +1,4 @@
+
 "use client";
 
 import * as React from "react";
@@ -36,6 +37,8 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { InviteDialog } from "./invite-dialog";
 import { Card, CardContent } from "./ui/card";
 import { Input } from "@/components/ui/input";
+import { db } from "@/lib/firebase";
+import { collection, getDocs, QueryDocumentSnapshot, DocumentData } from "firebase/firestore";
 
 
 export type Member = {
@@ -46,23 +49,20 @@ export type Member = {
   status: "active" | "invited";
 };
 
-const mockData: Member[] = [
-  { id: "1", name: "Alice Johnson", email: "alice@example.com", role: "admin", status: "active" },
-  { id: "2", name: "Bob Williams", email: "bob@example.com", role: "member", status: "active" },
-  { id: "3", name: "Charlie Brown", email: "charlie@example.com", role: "member", status: "active" },
-  { id: "4", name: "Diana Miller", email: "diana@example.com", role: "member", status: "invited" },
-  { id: "5", name: "Ethan Davis", email: "ethan@example.com", role: "member", status: "active" },
-  { id: "6", name: "Frank White", email: "frank@example.com", role: "member", status: "active" },
-  { id: "7", name: "Grace Lee", email: "grace@example.com", role: "member", status: "invited" },
-  { id: "8", name: "Henry Wilson", email: "henry@example.com", role: "member", status: "active" },
-  { id: "9", name: "Ivy Green", email: "ivy@example.com", role: "admin", status: "active" },
-  { id: "10", name: "Jack Black", email: "jack@example.com", role: "member", status: "active" },
-];
-
 async function getMembers(): Promise<Member[]> {
-  // In a real application, you would fetch this from your database.
-  // For now, we're returning the mock data.
-  return Promise.resolve(mockData);
+  const membersCol = collection(db, 'games_members');
+  const memberSnapshot = await getDocs(membersCol);
+  const memberList = memberSnapshot.docs.map((doc: QueryDocumentSnapshot<DocumentData>) => {
+    const data = doc.data();
+    return {
+        id: doc.id,
+        name: data.name,
+        email: data.email,
+        role: data.role,
+        status: data.status,
+    } as Member;
+  });
+  return memberList;
 }
 
 
@@ -147,7 +147,7 @@ export function MemberTableClient() {
   const [columnVisibility, setColumnVisibility] = React.useState<VisibilityState>({});
 
   React.useEffect(() => {
-    getMembers().then(setData);
+    getMembers().then(setData).catch(console.error);
   }, []);
 
 
