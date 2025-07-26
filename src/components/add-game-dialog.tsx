@@ -1,3 +1,4 @@
+
 "use client";
 
 import React from "react";
@@ -36,7 +37,7 @@ type AddGameFormValues = z.infer<typeof formSchema>;
 interface AddGameDialogProps {
   isOpen: boolean;
   setOpen: (isOpen: boolean) => void;
-  onGameAdd: (game: Omit<Game, 'id'>) => void;
+  onGameAdd: (game: Omit<Game, 'id' | 'wasDrawn' | 'suggestedBy' | 'organizationId'>) => void;
 }
 
 export function AddGameDialog({ isOpen, setOpen, onGameAdd }: AddGameDialogProps) {

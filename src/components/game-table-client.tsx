@@ -1,3 +1,4 @@
+
 "use client";
 
 import * as React from "react";
@@ -43,6 +44,10 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { AddGameDialog } from "./add-game-dialog";
 import { Card, CardContent } from "./ui/card";
+import { collection, query, where, getDocs, addDoc } from "firebase/firestore";
+import { auth, db } from "@/lib/firebase";
+import { useToast } from "@/hooks/use-toast";
+import { Checkbox } from "./ui/checkbox";
 
 export type Game = {
   id: string;
@@ -50,17 +55,10 @@ export type Game = {
   category: "co-op" | "single-player";
   type: "casual" | "historical";
   maxPlayers: number;
+  wasDrawn: boolean;
+  suggestedBy: string;
+  organizationId: string;
 };
-
-const mockData: Game[] = [
-  { id: "1", name: "Cyberpunk 2077", category: "single-player", type: "casual", maxPlayers: 1 },
-  { id: "2", name: "It Takes Two", category: "co-op", type: "casual", maxPlayers: 2 },
-  { id: "3", name: "Age of Empires IV", category: "single-player", type: "historical", maxPlayers: 8 },
-  { id: "4", name: "Stardew Valley", category: "co-op", type: "casual", maxPlayers: 4 },
-  { id: "5", name: "Crusader Kings III", category: "single-player", type: "historical", maxPlayers: 64 },
-  { id: "6", name: "Baldur's Gate 3", category: "co-op", type: "casual", maxPlayers: 4 },
-  { id: "7", name: "Sid Meier's Civilization VI", category: "single-player", type: "historical", maxPlayers: 12 },
-];
 
 const categoryIcons = {
   "co-op": <Users className="h-4 w-4" />,
@@ -92,33 +90,55 @@ export const columns: ColumnDef<Game>[] = [
     accessorKey: "category",
     header: "Category",
     cell: ({ row }) => {
-        const category = row.getValue("category") as keyof typeof categoryIcons;
-        return (
-            <Badge variant="outline" className="capitalize">
-                {categoryIcons[category]}
-                <span className="ml-2">{category}</span>
-            </Badge>
-        );
+      const category = row.getValue("category") as keyof typeof categoryIcons;
+      return (
+        <Badge variant="outline" className="capitalize">
+          {categoryIcons[category]}
+          <span className="ml-2">{category}</span>
+        </Badge>
+      );
     },
   },
   {
     accessorKey: "type",
     header: "Type",
     cell: ({ row }) => {
-        const type = row.getValue("type") as keyof typeof typeIcons;
-        return (
-            <Badge variant="outline" className="capitalize">
-                {typeIcons[type]}
-                <span className="ml-2">{type}</span>
-            </Badge>
-        );
+      const type = row.getValue("type") as keyof typeof typeIcons;
+      return (
+        <Badge variant="outline" className="capitalize">
+          {typeIcons[type]}
+          <span className="ml-2">{type}</span>
+        </Badge>
+      );
     },
   },
   {
     accessorKey: "maxPlayers",
     header: () => <div className="text-right">Max Players</div>,
     cell: ({ row }) => {
-      return <div className="text-right font-medium">{row.getValue("maxPlayers")}</div>;
+      return (
+        <div className="text-right font-medium">
+          {row.getValue("maxPlayers")}
+        </div>
+      );
+    },
+  },
+  {
+    accessorKey: "suggestedBy",
+    header: "Suggested By",
+    cell: ({ row }) => (
+      <div className="font-medium">{row.getValue("suggestedBy")}</div>
+    ),
+  },
+  {
+    accessorKey: "wasDrawn",
+    header: "Drawn",
+    cell: ({ row }) => {
+      return (
+        <div className="flex justify-center">
+            <Checkbox checked={row.getValue("wasDrawn")} disabled />
+        </div>
+      );
     },
   },
   {
@@ -127,21 +147,23 @@ export const columns: ColumnDef<Game>[] = [
     cell: ({ row }) => {
       return (
         <div className="text-right">
-            <DropdownMenu>
+          <DropdownMenu>
             <DropdownMenuTrigger asChild>
-                <Button variant="ghost" className="h-8 w-8 p-0">
+              <Button variant="ghost" className="h-8 w-8 p-0">
                 <span className="sr-only">Open menu</span>
                 <MoreHorizontal className="h-4 w-4" />
-                </Button>
+              </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-                <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                <DropdownMenuItem>Edit Game</DropdownMenuItem>
-                <DropdownMenuItem>View Details</DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem className="text-destructive">Delete Game</DropdownMenuItem>
+              <DropdownMenuLabel>Actions</DropdownMenuLabel>
+              <DropdownMenuItem>Edit Game</DropdownMenuItem>
+              <DropdownMenuItem>View Details</DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem className="text-destructive">
+                Delete Game
+              </DropdownMenuItem>
             </DropdownMenuContent>
-            </DropdownMenu>
+          </DropdownMenu>
         </div>
       );
     },
@@ -149,11 +171,43 @@ export const columns: ColumnDef<Game>[] = [
 ];
 
 export function GameTableClient() {
-  const [data, setData] = React.useState(() => [...mockData]);
+  const [data, setData] = React.useState<Game[]>([]);
   const [sorting, setSorting] = React.useState<SortingState>([]);
   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([]);
   const [columnVisibility, setColumnVisibility] = React.useState<VisibilityState>({});
   const [isAddGameOpen, setAddGameOpen] = React.useState(false);
+  const { toast } = useToast();
+  const [organizationId, setOrganizationId] = React.useState<string | null>(null);
+  const [currentUser, setCurrentUser] = React.useState<any | null>(null);
+
+  const fetchGames = React.useCallback(async (orgId: string) => {
+    const gamesQuery = query(collection(db, "games_list"), where("organizationId", "==", orgId));
+    const gamesSnapshot = await getDocs(gamesQuery);
+    const gamesList = gamesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Game));
+    setData(gamesList);
+  }, []);
+
+  React.useEffect(() => {
+    const unsubscribe = auth.onAuthStateChanged(async (user) => {
+        if (user) {
+            setCurrentUser(user);
+            const membersQuery = query(collection(db, "games_members"), where("uid", "==", user.uid));
+            const membersSnapshot = await getDocs(membersQuery);
+            if (!membersSnapshot.empty) {
+                const memberData = membersSnapshot.docs[0].data();
+                setOrganizationId(memberData.organizationId);
+                fetchGames(memberData.organizationId);
+            }
+        } else {
+            // Handle user not logged in
+            setData([]);
+            setOrganizationId(null);
+            setCurrentUser(null);
+        }
+    });
+
+    return () => unsubscribe();
+  }, [fetchGames]);
 
   const table = useReactTable({
     data,
@@ -171,9 +225,26 @@ export function GameTableClient() {
       columnVisibility,
     },
   });
-  
-  const addGame = (newGame: Omit<Game, "id">) => {
-    setData(prev => [{ ...newGame, id: (prev.length + 1).toString() }, ...prev]);
+
+  const addGame = async (newGame: Omit<Game, "id" | "wasDrawn" | "suggestedBy" | "organizationId">) => {
+    if (!organizationId || !currentUser) {
+        toast({ title: "Error", description: "You must be part of an organization to add a game.", variant: "destructive" });
+        return;
+    }
+
+    try {
+        const gameDoc = {
+            ...newGame,
+            wasDrawn: false,
+            suggestedBy: currentUser.displayName || currentUser.email,
+            organizationId: organizationId,
+        };
+        await addDoc(collection(db, 'games_list'), gameDoc);
+        fetchGames(organizationId);
+        toast({ title: "Success", description: "Game added successfully!" });
+    } catch(err) {
+        toast({ title: "Error", description: "Failed to add game.", variant: "destructive" });
+    }
   };
 
   return (
@@ -192,7 +263,7 @@ export function GameTableClient() {
         </Button>
       </div>
       <Card>
-        <CardContent>
+        <CardContent className="p-0">
           <Table>
             <TableHeader>
               {table.getHeaderGroups().map((headerGroup) => (
