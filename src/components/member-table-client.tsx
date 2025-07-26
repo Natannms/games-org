@@ -2,6 +2,7 @@
 "use client";
 
 import * as React from "react";
+import Link from "next/link";
 import {
   ColumnDef,
   flexRender,
@@ -34,7 +35,6 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { InviteDialog } from "./invite-dialog";
 import { Card, CardContent } from "./ui/card";
 import { Input } from "@/components/ui/input";
 import { db } from "@/lib/firebase";
@@ -141,7 +141,6 @@ export const columns: ColumnDef<Member>[] = [
 
 export function MemberTableClient() {
   const [data, setData] = React.useState<Member[]>([]);
-  const [isInviteOpen, setInviteOpen] = React.useState(false);
   const [sorting, setSorting] = React.useState<SortingState>([]);
   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([]);
   const [columnVisibility, setColumnVisibility] = React.useState<VisibilityState>({});
@@ -180,8 +179,10 @@ export function MemberTableClient() {
           className="max-w-sm"
         />
         <div className="ml-auto">
-          <Button onClick={() => setInviteOpen(true)}>
-            <PlusCircle className="mr-2 h-4 w-4" /> Invite Member
+          <Button asChild>
+            <Link href="/dashboard/members/invite">
+              <PlusCircle className="mr-2 h-4 w-4" /> Invite Member
+            </Link>
           </Button>
         </div>
       </div>
@@ -255,7 +256,6 @@ export function MemberTableClient() {
           Next
         </Button>
       </div>
-      <InviteDialog isOpen={isInviteOpen} setOpen={setInviteOpen} />
     </div>
   );
 }
