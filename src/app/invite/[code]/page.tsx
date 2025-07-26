@@ -2,10 +2,10 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useRouter, useParams } from "next/navigation";
+import { useState, useEffect } from "react";
 import { createUserWithEmailAndPassword } from "firebase/auth";
-import { collection, addDoc } from "firebase/firestore";
+import { collection, addDoc, query, where, getDocs } from "firebase/firestore";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Logo } from "@/components/logo";
@@ -14,31 +14,69 @@ import { Label } from "@/components/ui/label";
 import { auth, db } from "@/lib/firebase";
 import { useToast } from "@/hooks/use-toast";
 
-export default function InvitePage({ params }: { params: { code: string } }) {
+export default function InvitePage() {
   const router = useRouter();
+  const params = useParams();
   const { toast } = useToast();
-  const organizationName = "The Gaming Guild"; // Placeholder
-
+  
+  const [organizationName, setOrganizationName] = useState("your new organization");
+  const [organizationId, setOrganizationId] = useState<string | null>(null);
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  const inviteCode = Array.isArray(params.code) ? params.code[0] : params.code;
+
+  useEffect(() => {
+    async function fetchOrganization() {
+      if (!inviteCode) {
+        setError("Invalid invite link.");
+        setLoading(false);
+        return;
+      }
+
+      try {
+        const q = query(collection(db, "game_organization"), where("inviteCode", "==", inviteCode));
+        const querySnapshot = await getDocs(q);
+        
+        if (querySnapshot.empty) {
+          setError("This invitation is no longer valid.");
+        } else {
+          const orgDoc = querySnapshot.docs[0];
+          setOrganizationName(orgDoc.data().name);
+          setOrganizationId(orgDoc.id);
+        }
+      } catch (err) {
+        setError("Failed to verify invitation. Please try again.");
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    fetchOrganization();
+  }, [inviteCode]);
+
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!organizationId) {
+        setError("Cannot register without a valid organization.");
+        return;
+    }
     setError(null);
     try {
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       const user = userCredential.user;
 
-      // Add member to the firestore collection
       await addDoc(collection(db, "games_members"), {
         uid: user.uid,
         name: fullName,
         email: email,
         role: "member",
         status: "active",
-        organizationId: params.code, // Or a real org ID if the code maps to one
+        organizationId: organizationId,
       });
 
       router.push("/dashboard");
@@ -70,6 +108,14 @@ export default function InvitePage({ params }: { params: { code: string } }) {
     }
   };
 
+
+  if (loading) {
+    return (
+        <div className="flex min-h-screen items-center justify-center p-4">
+            <p>Loading invitation...</p>
+        </div>
+    )
+  }
 
   return (
     <div className="flex min-h-screen items-center justify-center p-4">
@@ -119,7 +165,7 @@ export default function InvitePage({ params }: { params: { code: string } }) {
                 />
               </div>
               {error && <p className="text-sm text-destructive text-center">{error}</p>}
-              <Button type="submit" className="w-full">
+              <Button type="submit" className="w-full" disabled={!organizationId}>
                 Accept & Create Account
               </Button>
             </form>

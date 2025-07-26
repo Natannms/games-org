@@ -15,6 +15,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Copy } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { auth, db } from "@/lib/firebase";
+import { collection, query, where, getDocs, updateDoc, doc, addDoc } from "firebase/firestore";
 
 interface InviteDialogProps {
   isOpen: boolean;
@@ -26,14 +28,51 @@ export function InviteDialog({ isOpen, setOpen }: InviteDialogProps) {
   const { toast } = useToast();
 
   React.useEffect(() => {
-    if (isOpen) {
-      // In a real app, you'd generate a unique link on the server
-      const newLink = `${window.location.origin}/invite/${Math.random().toString(36).substring(2, 10)}`;
-      setInviteLink(newLink);
+    async function generateInviteLink() {
+      if (isOpen) {
+        const user = auth.currentUser;
+        if (!user) {
+          toast({ title: "Error", description: "You must be logged in.", variant: "destructive" });
+          return;
+        }
+
+        try {
+          const orgQuery = query(collection(db, "game_organization"), where("ownerId", "==", user.uid));
+          const orgSnapshot = await getDocs(orgQuery);
+
+          if (orgSnapshot.empty) {
+            toast({ title: "Error", description: "You don't own an organization.", variant: "destructive" });
+            return;
+          }
+
+          const orgDoc = orgSnapshot.docs[0];
+          let inviteCode = orgDoc.data().inviteCode;
+
+          if (!inviteCode) {
+            inviteCode = Math.random().toString(36).substring(2, 10);
+            await updateDoc(doc(db, "game_organization", orgDoc.id), { inviteCode });
+          }
+
+          const newLink = `${window.location.origin}/invite/${inviteCode}`;
+          setInviteLink(newLink);
+
+        } catch (error) {
+            toast({ title: "Error", description: "Could not generate invite link.", variant: "destructive" });
+        }
+      }
     }
-  }, [isOpen]);
+    generateInviteLink();
+  }, [isOpen, toast]);
 
   const copyToClipboard = () => {
+    if(!inviteLink) {
+        toast({
+            title: "Error",
+            description: "No invite link generated yet.",
+            variant: "destructive",
+          });
+        return;
+    }
     navigator.clipboard.writeText(inviteLink);
     toast({
       title: "Copied to clipboard!",
@@ -55,9 +94,9 @@ export function InviteDialog({ isOpen, setOpen }: InviteDialogProps) {
             <Label htmlFor="link" className="sr-only">
               Link
             </Label>
-            <Input id="link" value={inviteLink} readOnly />
+            <Input id="link" value={inviteLink} readOnly placeholder="Generating invite link..."/>
           </div>
-          <Button type="button" size="sm" className="px-3" onClick={copyToClipboard}>
+          <Button type="button" size="sm" className="px-3" onClick={copyToClipboard} disabled={!inviteLink}>
             <span className="sr-only">Copy</span>
             <Copy className="h-4 w-4" />
           </Button>
