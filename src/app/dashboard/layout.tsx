@@ -93,8 +93,8 @@ export default function DashboardLayout({
     <SidebarMenu>
         {navItems.map((item) => (
             <SidebarMenuItem key={item.href}>
-                <Link href={item.href} legacyBehavior passHref>
-                    <SidebarMenuButton isActive={pathname === item.href} tooltip={item.label}>
+                <Link href={item.href}>
+                    <SidebarMenuButton isActive={pathname.startsWith(item.href) && (item.href === "/dashboard" || pathname !== "/dashboard")} tooltip={item.label}>
                         <item.icon />
                         <span>{item.label}</span>
                     </SidebarMenuButton>
