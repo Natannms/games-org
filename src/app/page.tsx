@@ -1,10 +1,40 @@
+
+"use client";
+
+import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Gamepad2, Users, ListPlus } from 'lucide-react';
 import { Logo } from '@/components/logo';
+import { auth } from '@/lib/firebase';
+import { onAuthStateChanged } from 'firebase/auth';
 
 export default function Home() {
+  const router = useRouter();
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      if (user) {
+        router.push('/dashboard');
+      } else {
+        setLoading(false);
+      }
+    });
+
+    return () => unsubscribe();
+  }, [router]);
+
+  if (loading) {
+    return (
+        <div className="flex min-h-screen items-center justify-center">
+            <p>Loading...</p>
+        </div>
+    )
+  }
+
   return (
     <div className="flex flex-col min-h-screen">
       <header className="container mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between">

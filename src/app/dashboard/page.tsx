@@ -153,8 +153,8 @@ export default function DashboardMetricsPage() {
       {lastDrawnGame && (
         <Card className="bg-primary/10 border-primary">
             <CardHeader>
-                <CardTitle className="font-headline text-lg">Next Game Up!</CardTitle>
-                <CardDescription>This is the game to play until the next draw.</CardDescription>
+                <CardTitle className="font-headline text-lg">Game Atual!</CardTitle>
+                <CardDescription>Curta a nova onda com esse novo game com seu time.</CardDescription>
             </CardHeader>
             <CardContent>
                 <div className="flex items-center justify-between">
