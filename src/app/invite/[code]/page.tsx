@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter, useParams } from "next/navigation";
 import { useState, useEffect } from "react";
 import { createUserWithEmailAndPassword } from "firebase/auth";
-import { collection, addDoc, query, where, getDocs } from "firebase/firestore";
+import { collection, addDoc, query, where, getDocs, doc, getDoc } from "firebase/firestore";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Logo } from "@/components/logo";
@@ -42,13 +42,14 @@ export default function InvitePage() {
         const querySnapshot = await getDocs(q);
         
         if (querySnapshot.empty) {
-          setError("This invitation is no longer valid.");
+          setError("This invitation is no longer valid or is incorrect.");
         } else {
           const orgDoc = querySnapshot.docs[0];
           setOrganizationName(orgDoc.data().name);
           setOrganizationId(orgDoc.id);
         }
       } catch (err) {
+        console.error("Error verifying invitation:", err);
         setError("Failed to verify invitation. Please try again.");
       } finally {
         setLoading(false);
@@ -62,7 +63,7 @@ export default function InvitePage() {
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!organizationId) {
-        setError("Cannot register without a valid organization.");
+        setError("Cannot register without a valid organization. The invite link might be incorrect.");
         return;
     }
     setError(null);
@@ -112,7 +113,7 @@ export default function InvitePage() {
   if (loading) {
     return (
         <div className="flex min-h-screen items-center justify-center p-4">
-            <p>Loading invitation...</p>
+            <p>Verifying your invitation...</p>
         </div>
     )
   }
@@ -126,9 +127,9 @@ export default function InvitePage() {
         </Link>
         <Card>
           <CardHeader className="text-center">
-            <CardTitle className="text-2xl font-headline">You're Invited to {organizationName}!</CardTitle>
+            <CardTitle className="text-2xl font-headline">You're Invited to Join</CardTitle>
             <CardDescription>
-              Create an account to accept your invitation.
+              <span className="font-bold text-primary">{organizationName}</span>! Create an account to accept.
             </CardDescription>
           </CardHeader>
           <CardContent>

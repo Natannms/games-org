@@ -16,7 +16,7 @@ import { Label } from "@/components/ui/label";
 import { Copy } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { auth, db } from "@/lib/firebase";
-import { collection, query, where, getDocs, updateDoc, doc, addDoc } from "firebase/firestore";
+import { collection, query, where, getDocs, updateDoc, doc } from "firebase/firestore";
 
 interface InviteDialogProps {
   isOpen: boolean;
@@ -41,7 +41,7 @@ export function InviteDialog({ isOpen, setOpen }: InviteDialogProps) {
           const orgSnapshot = await getDocs(orgQuery);
 
           if (orgSnapshot.empty) {
-            toast({ title: "Error", description: "You don't own an organization.", variant: "destructive" });
+            toast({ title: "Error", description: "You don't own an organization to invite members to.", variant: "destructive" });
             return;
           }
 
@@ -49,7 +49,8 @@ export function InviteDialog({ isOpen, setOpen }: InviteDialogProps) {
           let inviteCode = orgDoc.data().inviteCode;
 
           if (!inviteCode) {
-            inviteCode = Math.random().toString(36).substring(2, 10);
+            // Generate a simple unique invite code. For production, a more robust solution is recommended.
+            inviteCode = `org_${orgDoc.id.substring(0, 8)}`;
             await updateDoc(doc(db, "game_organization", orgDoc.id), { inviteCode });
           }
 
@@ -57,7 +58,8 @@ export function InviteDialog({ isOpen, setOpen }: InviteDialogProps) {
           setInviteLink(newLink);
 
         } catch (error) {
-            toast({ title: "Error", description: "Could not generate invite link.", variant: "destructive" });
+            console.error("Error generating invite link: ", error);
+            toast({ title: "Error", description: "Could not generate invite link. Please try again.", variant: "destructive" });
         }
       }
     }
