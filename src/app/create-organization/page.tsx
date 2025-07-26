@@ -45,10 +45,21 @@ export default function CreateOrganizationPage() {
     }
 
     try {
-      await addDoc(collection(db, "game_organization"), {
+      const orgDocRef = await addDoc(collection(db, "game_organization"), {
         name: orgName,
         ownerId: user.uid,
       });
+
+      // Add the owner as a member of the organization
+      await addDoc(collection(db, "games_members"), {
+        uid: user.uid,
+        name: user.displayName || user.email, // Use display name or email as fallback
+        email: user.email,
+        role: "admin", // Owner is an admin
+        status: "active",
+        organizationId: orgDocRef.id,
+      });
+
       router.push("/dashboard");
     } catch (err) {
       const errorMessage = "Failed to create organization. Please try again.";
