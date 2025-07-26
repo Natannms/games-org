@@ -6,8 +6,14 @@ import {
   flexRender,
   getCoreRowModel,
   useReactTable,
+  getPaginationRowModel,
+  getSortedRowModel,
+  getFilteredRowModel,
+  ColumnFiltersState,
+  SortingState,
+  VisibilityState,
 } from "@tanstack/react-table";
-import { MoreHorizontal, PlusCircle } from "lucide-react";
+import { MoreHorizontal, PlusCircle, ArrowUpDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -29,6 +35,8 @@ import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { InviteDialog } from "./invite-dialog";
 import { Card, CardContent } from "./ui/card";
+import { Input } from "@/components/ui/input";
+
 
 export type Member = {
   id: string;
@@ -44,12 +52,27 @@ const mockData: Member[] = [
   { id: "3", name: "Charlie Brown", email: "charlie@example.com", role: "member", status: "active" },
   { id: "4", name: "Diana Miller", email: "diana@example.com", role: "member", status: "invited" },
   { id: "5", name: "Ethan Davis", email: "ethan@example.com", role: "member", status: "active" },
+  { id: "6", name: "Frank White", email: "frank@example.com", role: "member", status: "active" },
+  { id: "7", name: "Grace Lee", email: "grace@example.com", role: "member", status: "invited" },
+  { id: "8", name: "Henry Wilson", email: "henry@example.com", role: "member", status: "active" },
+  { id: "9", name: "Ivy Green", email: "ivy@example.com", role: "admin", status: "active" },
+  { id: "10", name: "Jack Black", email: "jack@example.com", role: "member", status: "active" },
 ];
 
 export const columns: ColumnDef<Member>[] = [
   {
     accessorKey: "name",
-    header: "Name",
+    header: ({ column }) => {
+        return (
+          <Button
+            variant="ghost"
+            onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+          >
+            Name
+            <ArrowUpDown className="ml-2 h-4 w-4" />
+          </Button>
+        );
+      },
     cell: ({ row }) => {
         const name = row.getValue("name") as string;
         const fallback = name.split(' ').map(n => n[0]).join('');
@@ -112,16 +135,39 @@ export const columns: ColumnDef<Member>[] = [
 export function MemberTableClient() {
   const [data, setData] = React.useState(() => [...mockData]);
   const [isInviteOpen, setInviteOpen] = React.useState(false);
+  const [sorting, setSorting] = React.useState<SortingState>([]);
+  const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([]);
+  const [columnVisibility, setColumnVisibility] = React.useState<VisibilityState>({});
+
 
   const table = useReactTable({
     data,
     columns,
+    onSortingChange: setSorting,
+    onColumnFiltersChange: setColumnFilters,
     getCoreRowModel: getCoreRowModel(),
+    getPaginationRowModel: getPaginationRowModel(),
+    getSortedRowModel: getSortedRowModel(),
+    getFilteredRowModel: getFilteredRowModel(),
+    onColumnVisibilityChange: setColumnVisibility,
+    state: {
+      sorting,
+      columnFilters,
+      columnVisibility,
+    },
   });
 
   return (
     <div className="w-full">
       <div className="flex items-center py-4">
+        <Input
+          placeholder="Filter members by name..."
+          value={(table.getColumn("name")?.getFilterValue() as string) ?? ""}
+          onChange={(event) =>
+            table.getColumn("name")?.setFilterValue(event.target.value)
+          }
+          className="max-w-sm"
+        />
         <div className="ml-auto">
           <Button onClick={() => setInviteOpen(true)}>
             <PlusCircle className="mr-2 h-4 w-4" /> Invite Member
@@ -129,7 +175,7 @@ export function MemberTableClient() {
         </div>
       </div>
       <Card>
-        <CardContent>
+        <CardContent className="p-0">
         <Table>
             <TableHeader>
             {table.getHeaderGroups().map((headerGroup) => (
@@ -180,6 +226,24 @@ export function MemberTableClient() {
         </Table>
         </CardContent>
       </Card>
+      <div className="flex items-center justify-end space-x-2 py-4">
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => table.previousPage()}
+          disabled={!table.getCanPreviousPage()}
+        >
+          Previous
+        </Button>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => table.nextPage()}
+          disabled={!table.getCanNextPage()}
+        >
+          Next
+        </Button>
+      </div>
       <InviteDialog isOpen={isInviteOpen} setOpen={setInviteOpen} />
     </div>
   );
